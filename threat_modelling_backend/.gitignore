@@ -1,0 +1,17 @@
+*.swp
+package-lock.json
+__pycache__
+.pytest_cache
+.venv
+*.egg-info
+
+# CDK asset staging directory
+.cdk.staging
+cdk.out
+venv/
+.idea/
+.DS_Store
+
+# ignore all env files everywhere
+**/**/.env
+.env*

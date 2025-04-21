@@ -1,0 +1,226 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'CloudFormation template for Prototype Architecture'
+
+Resources:
+
+  # IAM Role para EC2
+  EC2IAMRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: EC2CDKDeploymentRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AdministratorAccess
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - !Ref EC2IAMRole
+
+  # EC2
+  EC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t3.micro
+      ImageId: ami-0e449927258d45bc4
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          yum update -y
+          yum install -y python3 git aws-cli
+          curl -fsSL https://rpm.nodesource.com/setup_16.x | bash -
+          yum install -y nodejs
+          npm install -g aws-cdk
+
+  # S3 Bucket para site estático (público)
+  StaticWebsiteBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: 'bucket-para-site-de-threat-moddeling'
+      WebsiteConfiguration:
+        IndexDocument: index.html
+        ErrorDocument: error.html
+
+  StaticWebsiteBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref StaticWebsiteBucket
+      PolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Sid: PublicReadGetObject
+            Effect: Allow
+            Principal: "*"
+            Action: "s3:GetObject"
+            Resource: !Sub "${StaticWebsiteBucket.Arn}/*"
+
+  # S3 Bucket armazenamento de diagrama
+  DiagramDataBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: 'bucket-para-site-diagrama-de-threat-moddeling'
+      AccessControl: Private
+
+  # AppSync GraphQL API
+  AppSyncAPI:
+    Type: AWS::AppSync::GraphQLApi
+    Properties:
+      Name: ThreatModelGraphQLAPI
+      AuthenticationType: AMAZON_COGNITO_USER_POOLS
+      UserPoolConfig:
+        AwsRegion: !Ref "AWS::Region"
+        UserPoolId: !Ref CognitoUserPool
+        DefaultAction: ALLOW
+
+  # Cognito UserPool
+  CognitoUserPool:
+    Type: AWS::Cognito::UserPool
+    Properties:
+      UserPoolName: ThreatModelUserPool
+
+  CognitoIdentityPool:
+    Type: AWS::Cognito::IdentityPool
+    Properties:
+      IdentityPoolName: ThreatModelIdentityPool
+      AllowUnauthenticatedIdentities: false
+
+  # Lambda Function para GraphQL
+  GraphQLResolverLambda:
+    Type: AWS::Lambda::Function
+    Properties:
+      FunctionName: GraphQLResolvers
+      Runtime: python3.12
+      Handler: index.lambda_handler
+      Role: !GetAtt LambdaExecutionRole.Arn
+      Code:
+        ZipFile: |
+          def lambda_handler(event, context):
+              return {"message": "GraphQL Resolver Lambda"}
+
+  # Lambda Execution Role
+  LambdaExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: LambdaExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+  # DynamoDB Table para Threat Models
+  ThreatModelTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: ThreatModels
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - AttributeName: "ThreatID"
+          AttributeType: "S"
+      KeySchema:
+        - AttributeName: "ThreatID"
+          KeyType: "HASH"
+
+  # EventBridge para mensagem assíncrona
+  EventBridgeBus:
+    Type: AWS::Events::EventBus
+    Properties:
+      Name: ThreatModelEventBus
+
+  # Step Function para geração de threats
+  StepFunctionsStateMachine:
+    Type: AWS::StepFunctions::StateMachine
+    Properties:
+      StateMachineName: ThreatGenerationWorkflow
+      RoleArn: !GetAtt StepFunctionsExecutionRole.Arn
+      DefinitionString: !Sub |
+        {
+          "Comment": "Threat generation workflow",
+          "StartAt": "InvokeLambda",
+          "States": {
+            "InvokeLambda": {
+              "Type": "Task",
+              "Resource": "arn:aws:states:::lambda:invoke",
+              "Parameters": {
+                "FunctionName": "${GraphQLResolverLambda.Arn}"
+              },
+              "End": true
+            }
+          }
+        }
+
+  StepFunctionsExecutionRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: StepFunctionsExecutionRole
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - states.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
+
+  # CloudFront para distribuição do site React
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        Origins:
+          - DomainName: !GetAtt StaticWebsiteBucket.DomainName
+            Id: S3Origin
+            S3OriginConfig: {}
+        DefaultCacheBehavior:
+          TargetOriginId: S3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: ["GET", "HEAD"]
+          ForwardedValues:
+            QueryString: false
+        DefaultRootObject: index.html
+
+  # AWS WAF WebACL
+  WebACL:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: ThreatModelWebACL
+      Scope: CLOUDFRONT
+      DefaultAction:
+        Allow: {}
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: ThreatModelWebACLMetric
+      Rules:
+        - Name: RateLimitRule
+          Priority: 1
+          Action:
+            Block: {}
+          Statement:
+            RateBasedStatement:
+              Limit: 1000
+              AggregateKeyType: IP
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: RateLimitRuleMetric

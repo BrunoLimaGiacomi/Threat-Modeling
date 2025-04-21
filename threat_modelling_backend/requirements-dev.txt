@@ -1,0 +1,18 @@
+# resolver lambda requirements
+-r backend/api/resolvers/main/requirements.txt
+
+# genai_core requirements
+-r backend/genai_core/requirements.txt
+
+# typing
+boto3-stubs-lite[bedrock-runtime,s3]==1.35.16
+
+# testing
+pytest==6.2.5
+pytest-cov
+nltk==3.9.1
+rouge==1.0.1
+scikit-learn==1.5.2
+jellyfish==1.1.0
+moto[dynamodb,s3]==5.0.16
+faker==30.1.0

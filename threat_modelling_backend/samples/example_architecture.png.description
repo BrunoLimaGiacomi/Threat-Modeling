@@ -1,0 +1,51 @@
+High Level Description:
+This architecture diagram illustrates a prototype system built on AWS services, designed for threat modeling and analysis. The system incorporates various AWS components to handle user authentication, data storage, processing, and AI-driven threat analysis. It demonstrates a serverless architecture with event-driven processing and integration of AI capabilities.
+
+1. Actors:
+   1.1. Application User (represented by a person icon)
+
+2. External Entities:
+   No explicit external entities are shown in the diagram.
+
+3. Data Stores:
+   3.1. Amazon DynamoDB: Persistence of Threat Models
+   3.2. Amazon S3: Uploaded Diagram Images
+   3.3. Amazon S3: Static website (part of the Frontend)
+   3.4. Amazon EventBridge: Message bus
+
+4. Processes:
+   4.1. AWS Lambda: Synchronous Resolvers
+   4.2. AWS Lambda: Asynchronous Resolvers
+   4.3. AWS Lambda: generateThreats Resolver
+   4.5. AWS Step Functions: Generate Threats workflow
+   4.6. Amazon Bedrock: Gen AI Models
+   4.7. AWS AppSync: Managed GraphQL
+   4.8. AWS Amplify: React library (part of the Frontend)
+   4.9. Amazon CloudFront: Content Delivery Network
+   4.10. Amazon Cognito: User authentication
+
+5. Data Flows:
+   5.1. From Browser to Amazon CloudFront, CloudFront is a CDN
+   5.2. From Amazon CloudFront to Amazon S3, S3 is configured as a Static Website, only allowing access from CloudFront
+   5.3. From Browser to Amazon Cognito, to authenticate and authorize login
+   5.4. From Browser to AWS AppSync, for invoking APIs
+   5.5. From AWS AppSync to AWS Lambda (Synchronous Resolver lambda function is directly triggered by AppSync)
+   5.6. From AWS AppSync to Amazon EventBridge (To implement Async resolvers, we use a message bus)
+   5.7. From Amazon EventBridge to AWS Lambda (Asynchronous Resolvers are triggered by events)
+   5.8. From AWS Lambda (Asynchronous Resolvers) to Amazon DynamoDB
+   5.9. From AWS Lambda (Asynchronous Resolvers) to Amazon S3 (Uploaded Diagram Images)
+   5.10. From Amazon EventBridge to AWS Step Functions
+   5.11. From AWS Step Functions to AWS Lambda (generateThreats Resolver)
+   5.12. From AWS Lambda (generateThreats Resolver) to Amazon Bedrock
+   5.13. From AWS Lambda (Synchronous Resolvers) to Amazon DynamoDB
+   5.14. From AWS Lambda (Synchronous Resolvers) to Amazon Bedrock
+
+6. Trust Boundaries:
+   6.1. Frontend boundary: Encompasses Browser, Amazon CloudFront, Amazon S3 (Static website), and AWS Amplify
+   6.2. Backend boundary: Encompasses all other AWS services within the AWS cloud
+   6.3. User authentication boundary: Between Browser and Amazon Cognito
+   6.4. API Gateway boundary: Between Frontend and AWS AppSync
+   6.5. Data processing boundary: Between AWS AppSync and downstream services (Lambda, EventBridge, DynamoDB, S3)
+   6.6. AI processing boundary: Between AWS Step Functions, Lambda (generateThreats), and Amazon Bedrock
+
+This architecture demonstrates a sophisticated serverless system leveraging various AWS services to create a secure, scalable, and AI-enhanced threat modeling platform. The use of multiple AWS services provides layered security, scalability, and separation of concerns in processing and storing sensitive threat model data.

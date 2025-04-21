@@ -1,0 +1,255 @@
+# Copyright 2024 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
+# Licensed under the Amazon Software License  http://aws.amazon.com/asl/
+
+type Mutation @aws_iam
+@aws_cognito_user_pools {
+    createDiagramDescription(diagramInput: CreateDiagramInput!): Diagram
+    diagramDescription(id: ID!, diagramDescription: String!): Diagram
+
+    """ Extracts DFD components from an image + description input """
+    extractComponents(extractComponentsInput: ExtractComponentsInput!): Diagram
+    """ This mutation is used to send the result of extraction to subscribers """
+    components(id: ID!, components: [ComponentInput]): Diagram
+
+    """ Starts the workflow that will generate threats from a list of components + (optional) stride types """
+    generateThreats(generateThreatsInput: GenerateThreatsInput!): Diagram
+    """ This mutation is used to send the result of the threats generated. Since we paralelize generation this may be called multiple times """
+    threats(id: ID!, components: [ComponentInput]): Diagram
+
+    createComponent(createComponentInput: CreateComponentInput): Component
+
+    updateComponent(updateComponentInput: UpdateComponentInput): Component
+    updateThreat(updateThreatInput: UpdateThreatInput): Threat
+
+    """ Hard deletes items """
+    deleteComponent(componentId: ID!): DeleteItemResponse!
+    deleteThreat(threatId: ID!): DeleteItemResponse!
+
+    """ send notification when all threats have been generated """
+    allThreatsGenerated(id: ID!): DiagramId
+
+    generateReport(threat_model_id: ID!): Report
+}
+
+type Query @aws_iam
+@aws_cognito_user_pools {
+    listDiagrams: [DiagramSummary]
+    getDiagram(id: ID!): Diagram
+}
+
+type Subscription @aws_iam
+@aws_cognito_user_pools {
+    createdDiagramDescription(id: ID): Diagram
+    @aws_subscribe(mutations: ["diagramDescription"])
+
+    extractedComponents(id: ID): Diagram
+    @aws_subscribe(mutations: ["components"])
+
+    generatedThreats(id: ID): Diagram
+    @aws_subscribe(mutations: ["threats"])
+
+    generatedAllThreats(id: ID): DiagramId
+    @aws_subscribe(mutations: ["allThreatsGenerated"])
+}
+
+scalar AWSJSON
+
+enum ThreatType {
+    Spoofing
+    Tampering
+    Repudiation
+    InformationDisclosure
+    DenialOfService
+    ElevationOfPrivileges
+}
+
+enum ThreatAction {
+    Mitigate
+    Avoid
+    Transfer
+    AcceptIgnore
+    NotApplicable
+}
+
+enum ComponentType {
+    Process
+    DataStore
+    DataFlow
+    Actor
+    TrustBoundary
+    ExternalEntity
+}
+
+type DREADScore @aws_iam
+@aws_cognito_user_pools {
+    damage: Int!
+    reproducibility: Int!
+    exploitability: Int!
+    affectedUsers: Int!
+    discoverability: Int!
+}
+
+type Threat @aws_iam
+@aws_cognito_user_pools {
+    id: ID!
+    name: String!
+    description: String!
+    threatType: ThreatType!
+    dreadScores: DREADScore!
+    action: ThreatAction!
+    reason: String
+}
+
+type Component @aws_iam
+@aws_cognito_user_pools {
+    id: ID!
+    name: String!
+    componentType: ComponentType!
+    description: String!
+    threats: [Threat]
+}
+
+enum DiagramStatus {
+    """ NA is a catch-all state, it simply means it is not in any of the other states """
+    NA
+
+    GENERATING_THREATS
+    THREATS_GENERATED
+}
+
+type Diagram @aws_iam
+@aws_cognito_user_pools {
+    id: ID
+    s3Prefix: String
+    userDescription: String
+    diagramDescription: String
+    components: [Component]
+
+    """ This attribute is meant to provide realtime status of threats generation """
+    status: DiagramStatus
+}
+
+type DiagramSummary @aws_iam
+@aws_cognito_user_pools {
+    id: ID!
+    s3Prefix: String!
+    status: DiagramStatus!
+
+    diagramDescription: String
+    userDescription: String
+}
+
+""" This type is used for notifying when we complete generation of threats """
+type DiagramId @aws_iam
+@aws_cognito_user_pools {
+    id: ID
+}
+
+type DeleteItemResponse @aws_iam
+@aws_cognito_user_pools {
+    success: Boolean!
+    message: String
+}
+
+type Report @aws_iam
+@aws_cognito_user_pools {
+    presignedUrl: String!
+}
+
+# Inputs
+
+input CreateDiagramInput {
+    id: ID!
+    s3Prefix: String!
+
+    """ this is an optional field that we use to enhance the generation of the description """
+    userDescription: String
+
+    modelId: String
+}
+
+input ExtractComponentsInput {
+    id: ID!
+    s3Prefix: String!
+    diagramDescription: String!
+
+    modelId: String
+}
+
+input GenerateThreatsInput {
+    id: ID!
+    s3Prefix: String!
+    diagramDescription: String!
+    components: [ComponentInput!]!
+
+    """ you can pass an empty list and the backend will generate threats for all Stride Types """
+    threatTypes: [ThreatType]!
+
+    modelId: String
+}
+
+input ComponentInput {
+    id: ID!
+    name: String!
+    description: String!
+    componentType: ComponentType!
+    threats: [ThreatInput]
+}
+
+input CreateComponentInput {
+    id: ID!
+    diagramId: ID!
+
+    name: String
+    description: String
+    componentType: ComponentType
+}
+
+input UpdateComponentInput {
+    id: ID!
+    diagramId: ID!
+    componentId: ID!
+
+    name: String
+    description: String
+    componentType: ComponentType
+}
+
+input DREADScoreInput{
+    damage: Int!
+    reproducibility: Int!
+    exploitability: Int!
+    affectedUsers: Int!
+    discoverability: Int!
+}
+
+
+input ThreatInput {
+    id: ID!
+    name: String!
+    description: String!
+    threatType: ThreatType!
+    dreadScores: DREADScoreInput!
+    action: ThreatAction!
+}
+
+input UpdateThreatInput {
+    id: ID!
+    diagramId: ID!
+    componentId: ID!
+    threatId: ID!
+
+    name: String
+    description: String
+    threatType: ThreatType
+    dreadScores: DREADScoreInput
+    action: ThreatAction
+    reason: String
+}
+
+schema {
+    query: Query
+    mutation: Mutation
+    subscription: Subscription
+}

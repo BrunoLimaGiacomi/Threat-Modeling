@@ -1,0 +1,15 @@
+[tool.black]
+line-length = 120
+target-version = ['py312']
+include = '\.pyi?$'
+
+[tool.pytest.ini_options]
+markers = [
+    "integration: Runs integration test by hitting real Bedrock API",
+]
+# by default, we don't run e2e or local integration tests. To run them, use `-m 'e2e'` when invoking pytest
+addopts = "-m 'not integration'"
+filterwarnings = [
+    "ignore::DeprecationWarning"
+]
+norecursedirs = ["cdk.out", ".venv", "venv"]

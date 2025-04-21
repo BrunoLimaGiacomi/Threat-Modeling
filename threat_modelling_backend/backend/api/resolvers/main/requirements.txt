@@ -1,0 +1,12 @@
+# Copyright 2024 Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: LicenseRef-.amazon.com.-AmznSL-1.0
+# Licensed under the Amazon Software License  http://aws.amazon.com/asl/
+
+aws-lambda-powertools==2.43.1
+boto3==1.35.16
+requests==2.32.3
+requests_aws4auth==1.3.1
+pydantic==2.9.1
+
+openpyxl==3.1.5
+pandas==2.2.3

@@ -1,0 +1,11 @@
+# To prevent us from checking into the repository real customer data
+# we will ignore all images in this folder. When we replace them with
+# synthetic data, we can remove these rules
+
+*.png
+*.jpg
+*.jpeg
+
+*.png.description
+*.jpg.description
+*.jpeg.description
