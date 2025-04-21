@@ -27,11 +27,11 @@ Resources:
         - !Ref EC2IAMRole
 
   # EC2
-  EC2Instance:
+  EC2Instance:  
     Type: AWS::EC2::Instance
     Properties:
       InstanceType: t3.micro
-      ImageId: ami-0e449927258d45bc4
+      ImageId: ami-0e449927258d45bc4    #Verificar imagem
       IamInstanceProfile: !Ref EC2InstanceProfile
       UserData:
         Fn::Base64: !Sub |
@@ -42,33 +42,21 @@ Resources:
           yum install -y nodejs
           npm install -g aws-cdk
 
-  # S3 Bucket para site estático (público)
-  StaticWebsiteBucket:
+  # S3 Bucket para site estatico
+  StaticWebsiteBucket:              #Trocar nome do bucket
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: 'bucket-para-site-de-threat-moddeling'
+      BucketName: 'bucket-para-site-de-threat-moddelingg' #Trocar nome do bucket
+      AccessControl: Private
       WebsiteConfiguration:
         IndexDocument: index.html
         ErrorDocument: error.html
 
-  StaticWebsiteBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref StaticWebsiteBucket
-      PolicyDocument:
-        Version: "2012-10-17"
-        Statement:
-          - Sid: PublicReadGetObject
-            Effect: Allow
-            Principal: "*"
-            Action: "s3:GetObject"
-            Resource: !Sub "${StaticWebsiteBucket.Arn}/*"
-
   # S3 Bucket armazenamento de diagrama
-  DiagramDataBucket:
+  DiagramDataBucket:             #Trocar nome do bucket
     Type: AWS::S3::Bucket
     Properties:
-      BucketName: 'bucket-para-site-diagrama-de-threat-moddeling'
+      BucketName: 'bucket-para-site-diagrama-de-threat-moddeling' #Trocar nome do bucket
       AccessControl: Private
 
   # AppSync GraphQL API
@@ -79,7 +67,7 @@ Resources:
       AuthenticationType: AMAZON_COGNITO_USER_POOLS
       UserPoolConfig:
         AwsRegion: !Ref "AWS::Region"
-        UserPoolId: !Ref CognitoUserPool
+        UserPoolId: !Ref CognitoUserPool #talvez trocar
         DefaultAction: ALLOW
 
   # Cognito UserPool
@@ -87,6 +75,13 @@ Resources:
     Type: AWS::Cognito::UserPool
     Properties:
       UserPoolName: ThreatModelUserPool
+
+  CognitoUserPoolClient:
+   Type: AWS::Cognito::UserPoolClient
+   Properties:
+       ClientName: ThreatModelUserPoolClient
+       UserPoolId: !Ref CognitoUserPool
+       GenerateSecret: false   
 
   CognitoIdentityPool:
     Type: AWS::Cognito::IdentityPool
@@ -99,9 +94,9 @@ Resources:
     Type: AWS::Lambda::Function
     Properties:
       FunctionName: GraphQLResolvers
-      Runtime: python3.12
+      Runtime: python3.8
       Handler: index.lambda_handler
-      Role: !GetAtt LambdaExecutionRole.Arn
+      Role: !GetAtt LambdaExecutionRole.Arn #Verificar arn
       Code:
         ZipFile: |
           def lambda_handler(event, context):
@@ -122,7 +117,7 @@ Resources:
             Action:
               - sts:AssumeRole
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole 
 
   # DynamoDB Table para Threat Models
   ThreatModelTable:
@@ -137,13 +132,13 @@ Resources:
         - AttributeName: "ThreatID"
           KeyType: "HASH"
 
-  # EventBridge para mensagem assíncrona
+  # EventBridge para mensagem assincrona
   EventBridgeBus:
     Type: AWS::Events::EventBus
     Properties:
       Name: ThreatModelEventBus
 
-  # Step Function para geração de threats
+  # Função para parar a geração de threat
   StepFunctionsStateMachine:
     Type: AWS::StepFunctions::StateMachine
     Properties:
@@ -164,7 +159,7 @@ Resources:
             }
           }
         }
-
+ 
   StepFunctionsExecutionRole:
     Type: AWS::IAM::Role
     Properties:
@@ -179,18 +174,19 @@ Resources:
             Action:
               - sts:AssumeRole
       ManagedPolicyArns:
-        - arn:aws:iam::aws:policy/service-role/AWSLambdaRole
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaRole 
 
-  # CloudFront para distribuição do site React
+  # Cloud front para distribuição react
   CloudFrontDistribution:
     Type: AWS::CloudFront::Distribution
     Properties:
       DistributionConfig:
         Enabled: true
         Origins:
-          - DomainName: !GetAtt StaticWebsiteBucket.DomainName
+          - DomainName: !Sub "${StaticWebsiteBucket}.s3.amazonaws.com" #Puxando da linha 40
             Id: S3Origin
-            S3OriginConfig: {}
+            S3OriginConfig:
+              OriginAccessIdentity: ""
         DefaultCacheBehavior:
           TargetOriginId: S3Origin
           ViewerProtocolPolicy: redirect-to-https
@@ -204,13 +200,13 @@ Resources:
     Type: AWS::WAFv2::WebACL
     Properties:
       Name: ThreatModelWebACL
-      Scope: CLOUDFRONT
+      Scope: CLOUDFRONT #virginia do norte
       DefaultAction:
         Allow: {}
       VisibilityConfig:
         SampledRequestsEnabled: true
         CloudWatchMetricsEnabled: true
-        MetricName: ThreatModelWebACLMetric
+        MetricName: ThreatModelWebACLMetric 
       Rules:
         - Name: RateLimitRule
           Priority: 1
@@ -224,3 +220,34 @@ Resources:
             SampledRequestsEnabled: true
             CloudWatchMetricsEnabled: true
             MetricName: RateLimitRuleMetric
+
+Outputs:
+  ViteCognitoUserPoolId:
+    Description: Cognito User Pool ID for frontend
+    Value: !Ref CognitoUserPool
+    Export:
+      Name: VITE-COGNITO-USER-POOL-ID
+ 
+  ViteCognitoUserPoolClientId:
+    Description: Cognito User Pool Client ID for frontend
+    Value: !Ref CognitoUserPoolClient
+    Export:
+      Name: VITE-COGNITO-USER-POOL-CLIENT-ID
+ 
+  ViteCognitoIdentityPoolId:
+    Description: Cognito Identity Pool ID for frontend
+    Value: !Ref CognitoIdentityPool
+    Export:
+      Name: VITE-COGNITO-IDENTITY-POOL-ID
+ 
+  ViteDataBucketName:
+    Description: S3 bucket name for data/diagram storage
+    Value: !Ref DiagramDataBucket
+    Export:
+      Name: VITE-DATA-BUCKET-NAME
+ 
+  ViteGraphQLEndpoint:
+    Description: AppSync GraphQL Endpoint
+    Value: !GetAtt AppSyncAPI.GraphQLUrl
+    Export:
+      Name: VITE-GRAPHQL-ENDPOINT
