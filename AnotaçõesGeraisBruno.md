@@ -1,187 +1,126 @@
-# Unified Step-by-Step Guide for GenAI Threat Modeling Platform on AWS
+# Guia de como fazer deploy desse troço no windows
 
-This document provides comprehensive instructions for deploying and managing a complete GenAI-based Threat Modeling solution (Frontend and Backend) on AWS.
+(lembre-se que o ECR criado aqui está public)
 
-## 1. Prerequisites
+## 1. Prerequisitos do backEnd
 
-Ensure you have installed and configured the following tools:
+Dê prioridade de fazer no linux, no windows pode dar alguns problemas que serão abordados abaixo (pois fiz no windows)
 
-AWS CLI (https://docs.aws.amazon.com/cli/latest/userguide/cli-chap-install.html)
+1- Faça o update das seguintes extensões ou o download delas: 
 
-AWS CDK (https://docs.aws.amazon.com/cdk/v2/guide/getting_started.html)
+- Python 3.11 or higher
+- git
+- JSON e NPN [instructions for installing](https://nodejs.org/pt)
+- Chocolatey - O Chocolatey será util para driplar alguns problemas de compatibilidade do windows com o docker
+- Docker - [instructions for installing](https://docs.docker.com/engine/install/)
+- AWS CLI - [instructions for installing](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
+- AWS CDK - [instructions for installing](https://docs.aws.amazon.com/cdk/v2/guide/getting_started.html)
 
-Docker (https://docs.docker.com/engine/install/)
+Deixe o python no path pelo seguinte caminho: Painel de Controle > Sistema > Configurações Avançadas > Variáveis de Ambiente > Path > Editar > dar ok em tudo
 
-Node.js >= 18.x.x https://github.com/nodesource/distributions
+sincronize com o gitlab e conecte com o repositorio
 
-Python 3.11+
+faça download do Docker desktop e entre com uma conta. Não se esqueça de dar as permissões para ele e atualizar na mão o comando que ele vai de dar para habilitar o microambiente linux no seu windows para subir os containers (faça tudo isso no powershell)
 
-git
+O Chocolatey tbm precisa ser feito pelo powershell
 
-Set up AWS credentials:
+## 2. Arrumando o código
 
-    "aws configure"
+Suba o env do python como descrito no README do BackEnd. *ATENÇÃO:* Se o "python3" não estiver funcionando, use apenas "Python" que funcione (mas para isso, o seu python deve ser a versão 3.12 pra cima)
 
-## 2. Deploying the Backend Stack
+ative ele com o .bat, pois vc está no windows
 
-Step-by-Step:
+Crie a pasta "requirements.txt" na raiz do projeto e dê "pip install -r requirements.txt"
 
-### A. Set Up the EC2 Deployment Environment (Recommended)
+## 3. Fazendo deploy do BackEnd
 
-Launch an EC2 instance (t3.micro or t3.small).
+Certifique-se que está na us-east-1
 
-Attach an IAM role with permissions for AWS services (CDK, S3, ECR, CloudFormation).
+Certifique-se que o Docker está "Engine Running"
 
-Update repositories and install dependencies:
+Crie um usuario no IAM com as seguintes permissões: AdministratorAccess
+                                                    AmazonEC2ContainerRegistryFullAccess
+                                                    AmazonECS_FullAccess
+                                                    AmazonElasticContainerRegistryPublicFullAccess
+                                                    AmazonElasticContainerRegistryPublicPowerUser
+                                                    AmazonElasticContainerRegistryPublicReadOnly
+                                                    EC2InstanceProfileForImageBuilderECRContainerBuilds
+                                                    {
+	                                                    "Version": "2012-10-17",
+                                                        "Statement": [
+		                                                        {
+			                                                        "Effect": "Allow",
+			                                                        "Action": [
+			                                                        	"ecr-public:GetAuthorizationToken",
+				                                                        "sts:GetServiceBearerToken"
+		                                                        	],
+			                                                        "Resource": "*"
+		                                                        }
+	                                                    ]
+                                                    }
+Deve-se observar, é claro, que as politicas acima foram usadas de maneira irresponsável e não se deve fazer isso em ambiente produtivo ou de stage. Verificar quais politicas podem ser substituidas.
+(O Administrador acess foi usado para driplar a necessidade da politica de permissão para escrever e ler no cloudformation que não foi achada por mim)
 
-    "sudo apt-get update"
-    "sudo apt-get install python3.11 python3.11-venv python3-pip git"
+execute o "aws ecr-public get-login-password --region us-east-1 | docker login --username AWS --password-stdin public.ecr.aws", se der algum erro, 99% ser por causa de permissão, olhar a linha abaixo.
 
-### B. Clone the Backend Repository:
+Caso o problema for algo relacionado ao docker não conseguir puxar as credenciais da AWS (Error saving credentials: error storing credentials - err: exit status 1, out: `not implemented`), vá para o arquivo "config.json" dentro do .docker e troque 'credsStore : "desktop"' por 'credsStore" : "ecr-login"' e entre no powershell com PERMISSÃO DE ADMINISTRADOR e use "choco install amazon-ecr-credential-helper". Salve tudo e execute dnv. Caso der errado, entre novamente no "config.json" e *apague* a linha do credsStore. Execute o comando novamente (foi assim que funcionou cmg, puro exploit sem sentido). Talvez não funcione com você, sendo assim, boa sorte!
 
-    "git clone <your_backend_repo>"
-    "cd backend"
+o "cdk synth" não funciona se não indicar o caminho certinho, como: "cd Área de Trabalho\Threat-Modeling\threat_modelling_backend" e lá dentro manda o  'cdk synth --app "python Threat-Modeling/threat_modelling_backend/app.py"'
 
-### C. Create a Python Virtual Environment:
+Se der um erro tipo "ModuleNotFoundError: No module named 'aws_cdk'", provavelmente quer dizer que o env do python não está rodando (vc tem que estar dentro dele e com os requirements lá dentro): 
+(
+    appdata==2.2.1
+    click==8.1.8
+    colorama==0.4.6
+    colored==2.3.0
+    to-requirements.txt==2.0.11
+)
 
-    "python3.11 -m venv .venv"
-    "source .venv/bin/activate"
-    "pip install -r requirements.txt"
+Provavelmente vai dar algum erro do genero: "Cannot find asset at C:\Users\SeuNome\Área de Trabalho\Threat Moddeling\backend\genai_core". Esse erro ocorre pois ele está puxando um grupo de arquivos, como por exemplo: "__innit__.py", outros arquivos .py e o requirements.txt, que não está nessa pasta, e sim em uma outra pasta com o mesmo nome que está dentro de "\genai_core", algo com  "\backend\genai_core\genai_core". A solução que eu achei foi dar um CTRL+X no conteudo do segundo "genai_core" e colar no primeiro "genai_core".
 
-### D. AWS CDK Bootstrap:
+Agora, provavelmente vai dar outro erro similares ao de cima, só que em outra pasta chamada "graphql_api.py". Ele está procurando coisa em lugar errado. Entre nele e procure pela função "shared_layer = lambda_py.PythonLayerVersion" e corrija o caminho (entry) para 'entry="Threat-Modeling/threat_modelling_backend/backend/api/shared"', ; Pode trocar a linha inteira e cuidado para a identação não ficar errada.
 
-Bootstrap your AWS account (first-time only):
+Descrevi acima os erros que deram comigo, se foi tudo tranquilo contigo, pode prosseguir com "aws sts get-caller-identity" para pegar as informações da sua conta AWS e dê "cdk bootstrap aws://123456789012/us-east-1". *OBSERVE:* o 123456789 é o numero da sua conta que vc vai pegar com o "get-caller-identity"
 
-    "cdk bootstrap aws://<YOUR_ACCOUNT_ID>/<REGION>"
+Para dar "cdk deploy --all --require-approval=never", você deve estar em 'Threat-Modeling', ou seja, da um cd Área de Trabalho\Threat Moddeling\Threat-Modeling ou algo do genero e execute assim 'cdk deploy --all --require-approval=never --app "python Threat-Modeling/threat_modelling_backend/app.py"'
 
-### D. Deploy the Backend Stack:
+Se tudo der certo, vc deve montar o .env com os valores passados, *MAS ATENÇÃO*, como você pode ver pelo example.env, o prompt (por algum motivo) não vai de dar todos os values de output e a documentação nem escalarece se deve ser usado apenas os valores ou chaves + valores. Entre no cloudformation da sua conta AWS e pegue todos os values e chaves na mão lá. Sugiro armazenar num bloquinho de notas e colocar lá no example, mas fique de olho, pq provavelmente isso vai causar problemas. 
 
-    "cdk deploy --all --require-approval=never"
+## 4. Mandar os samples pra s3
 
-*Optional: Cross-account Amazon Bedrock access:*
+Não tende colocar os samples na mão, provavelmente vai dar problema. Use o código disponibilizado no README ou o que deixarei aqui abaixo:
 
-    "cdk deploy --all --require-approval=never --context BEDROCK_XACCT_ROLE=arn:aws:iam::XXX:role/YOUR_XACCT_ROLE"
+1- Vá até a \threat_modelling_backend, com o 'cd'
 
-### E. Upload Sample Files:
+2- Rode no bash: aws s3 cp samples/example_architecture.png s3://backendstack-threatmodeldatabucketd3863f79-roxfdt85dhnx/genai_core_examples/diagram_describer/
+                 aws s3 cp samples/example_architecture.png.description s3://backendstack-threatmodeldatabucketd3863f79-roxfdt85dhnx/genai_core_examples/diagram_describer/
 
-Create directories and upload example architecture diagrams:
+Ele já vai fazer o caminho bonitinho na s3 para armazenar os samples.
 
-    "aws s3 cp samples/example_architecture.png s3://<DataBucketName>/genai_core_examples/diagram_describer/"
-    "aws s3 cp samples/example_architecture.png.description s3://<DataBucketName>/genai_core_examples/diagram_describer/"
+Os samples utilizados são os do projeto, mas é recomendado botar um monte para ele aprender melhor e mais rapido.
 
-Ensure filenames follow the convention:
+## 5. Verificar permissões do BEDROCK
 
-    "my_arch.png"
-    "my_arch.png.description"
+Provavelmente o CDK já criou os lambda com permissão pra acessar o Bedrock e os modelos Claude, mas sempre bom dar uma verificada adicional:
 
-### E. Take Note of Backend Stack Outputs:
+1- Entre na sua conta AWS e vá para os Lambda
+2- Clique na função  "BackendStack-ThreatModelGenerateAll[...]"
+3- Vá em "configurations" e após isso "permissions"
+4- Clique em "Execution roles > Resources" ou "Resumo de recursos > Por recurso" e procure por "Amazon Bedrock"
 
-From AWS CloudFormation console, note:
+Agora, entre no menu do Bedrock e desça a barra lateral esquerda lá pra baixo e selecione "Model acess" ou "Acesso aos modelos".
 
-                                    ThreatModelGenerateDataBucketName
+Clique no botão amarelo para selecionar umas licenças e pegue a do:
 
-                                    ThreatModelGraphQLEndpoint
+    Anthropic Claude 3 – Haiku
 
-                                    UserPoolId, IdentityPoolId
+    Anthropic Claude 3 – Sonnet
 
-## 3. Deploying the Frontend Stack
+    Anthropic Claude 3.5 – Sonnet
 
-Step-by-Step:
+De "Confirmar" e espere uns 30 minutos
 
-### A. Clone the Frontend Repository:
+Faça uma reza e vá para o FrondEnd
 
-    "git clone <your_frontend_repo>"
-    "cd frontend"
-
-### B. Configure the Frontend Environment:
-
-Create the .env file inside the webapp/ directory:
-
-VITE_APP_NAME="Threat Modeling Platform"
-VITE_AWS_REGION="<Your AWS Region>"
-VITE_AUTH_MODE="userPool"
-VITE_COGNITO_USER_POOL_ID="<UserPoolId>"
-VITE_COGNITO_USER_POOL_CLIENT_ID="<AppClientId>"
-VITE_COGNITO_IDENTITY_POOL_ID="<IdentityPoolId>"
-VITE_AWS_REGION="<Region>"
-VITE_AUTH_MODE="userPool"
-VITE_APP_NAME="Threat Modeling Platform"
-VITE_GRAPHQL_ENDPOINT="<GraphQLEndpoint>"
-
-*Important: Replace placeholders using outputs from the backend stack deployed in CloudFormation.*
-
-### C. Install Dependencies:
-
-Inside the webapp directory:
-
-    "npm install"
-
-### D. Create Cognito Users:
-
-Log into the AWS Cognito Console.
-
-Select your User Pool and create necessary users to log in to the frontend.
-
-### E. Deploy Frontend Stack with CDK:
-
-At the root of the frontend directory:
-
-    "cdk deploy --require-approval=never"
-
-This builds the React app and deploys it using Amazon S3, CloudFront, and AWS WAF for security.
-
-## 4. Development and Local Testing
-
-Frontend Development:
-
-Navigate to the webapp directory.
-
-    "npm run dev"
-
-Access: http://localhost:5173/
-
-Backend Testing:
-
-Run unit tests from the backend root directory:
-
-    "PYTHONPATH="backend/api/resolvers/main:backend/genai_core:backend/api/shared" pytest tests/unit"
-
-## 5. Updating GraphQL Schema and Types (Frontend Integration):
-
-From the webapp directory:
-
-    "npx @aws-amplify/cli codegen types --apiId <GraphQL_API_ID> --region <Region>"
-    "npx @aws-amplify/cli codegen"
-
-## 6. Security Considerations
-
-Your deployment includes security controls:
-
-AWS WAF (for frontend protection via CloudFront)
-
-IAM roles and policies strictly scoped to necessary actions.
-
-AWS Cognito manages user authentication securely.
-
-Secure API endpoints via AWS AppSync.
-
-Ensure IAM roles and permissions are configured following least privilege principles.
-
-## 7. Customizing Prompts for Threat Modeling
-
-Backend prompts are customizable in the following path:
-
-    "backend/genai_core"
-
-Adjust the prompts according to your threat-modeling needs.
-
-## 8. Troubleshooting
-
-Verify your IAM identity:
-
-    "aws sts get-caller-identity"
-
-Verify CloudFormation stack deployment statuses in the AWS console.
-
-Confirm EC2 IAM roles if deploying from an EC2 instance.
+## 6. Prerequisitos do FrontEnd
 
