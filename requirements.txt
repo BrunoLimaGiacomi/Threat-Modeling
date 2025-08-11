@@ -1,0 +1,5 @@
+appdata==2.2.1
+click==8.1.8
+colorama==0.4.6
+colored==2.3.0
+to-requirements.txt==2.0.11
