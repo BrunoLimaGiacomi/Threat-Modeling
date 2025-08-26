@@ -24,7 +24,7 @@ Faça download do Docker desktop e entre com uma conta. Não se esqueça de dar 
 
 O Chocolatey tbm precisa ser feito pelo powershell
 
---
+---
 
 2- Clone o repositório do projeto a partir do GitLab.
 
