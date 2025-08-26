@@ -24,6 +24,8 @@ Faça download do Docker desktop e entre com uma conta. Não se esqueça de dar 
 
 O Chocolatey tbm precisa ser feito pelo powershell
 
+--
+
 2- Clone o repositório do projeto a partir do GitLab.
 
 3 Faça o download do Docker Desktop, crie uma conta e siga as instruções de instalação. Será necessário conceder permissões e executar um comando no PowerShell para habilitar o subsistema Windows para Linux (WSL 2), que é essencial para rodar os contêineres.
