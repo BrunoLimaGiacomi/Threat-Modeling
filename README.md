@@ -8,10 +8,10 @@ Dê prioridade de fazer no linux, no windows pode dar alguns problemas que serã
 
 1- Faça o update das seguintes extensões ou o download delas: 
 
-- Python 3.11 or higher
-- git
+- [Python 3.11 or higher](https://www.python.org/downloads/)
+- [Git](https://git-scm.com/downloads)
 - JSON e NPN [instructions for installing](https://nodejs.org/pt)
-- Chocolatey - O Chocolatey será util para driplar alguns problemas de compatibilidade do windows com o docker
+- [Chocolatey - O Chocolatey será util para driplar alguns problemas de compatibilidade do windows com o docker](https://chocolatey.org/)
 - Docker - [instructions for installing](https://docs.docker.com/engine/install/)
 - AWS CLI - [instructions for installing](https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html)
 - AWS CDK - [instructions for installing](https://docs.aws.amazon.com/cdk/v2/guide/getting_started.html)
